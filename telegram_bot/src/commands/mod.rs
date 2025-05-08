@@ -51,13 +51,16 @@ pub enum Command {
     )]
     Restore { mnemonic: String, password: String },
     #[command(
-        description = "<telegram_username> <amount> <password>, tip a user with a specific amount.",
+        description = "<telegram_username> <amount> <password> [optional] <message>, tip a user with a specific amount. You may include an optional message~",
         parse_with = "split"
     )]
     Send {
         telegram_username: String,
         amount: String,
         password: String,
+
+        message: Option<String>, // optional tip message!
+
     },
     #[command(
         description = "<address> <amount> <password>, withdraw funds from your wallet.",

@@ -8,7 +8,8 @@ use std::sync::Arc;
 
 use spectre_wallet_core::tx::{Fees, PaymentOutputs};
 use spectre_wallet_keys::secret::Secret;
-use teloxide::{Bot, types::Message};
+//adding more imports to teloxide!~
+use teloxide::{prelude::Requester, Bot, types::{Message, ChatId, UserId}};
 use user::user::TipUser;
 use workflow_core::prelude::Abortable;
 
@@ -22,6 +23,7 @@ pub async fn command_send(
     password: String,
     amount: String,
     recipient_username: String,
+    tip_message: Option<String>, //optional tip message!
 ) -> Result<(), TelegramBotError> {
     let is_opened = tip_context.does_opened_owned_wallet_exists(tip_sender.wallet_identifier());
     let is_initiated = match is_opened {
@@ -33,6 +35,36 @@ pub async fn command_send(
                 .await?
         }
     };
+
+    /* 
+    putting pseudo channel ID for use for send function:
+    
+    using get_chat_member function (or is it a struct??), we can use a channel ID to find our recipient
+
+    (context/source --> from teloxide reference) vvvvvvvvvv
+
+        pub fn new(chat_id: impl Into<Recipient>, user_id: UserId) -> GetChatMember
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        |
+                        --> https://docs.rs/teloxide/latest/teloxide/types/enum.Recipient.html
+                            |
+                            --> "A unique identifier for the target chat or username 
+                                of the target channel (in the format @channelusername)."
+
+    *Creating a placeholder for channel ID below!*
+    */ 
+    // had copilot help try to define the correct type for channel ID, unsure if this is correct :(
+    let channel_id = teloxide::types::Recipient::ChannelUsername("@totally_legit_channel_woohoo!".to_string());
+
+    // FOR USE TIP MESSAGE FEATURE -> need to convert recipient_username to user_id:
+        let recipient_chat_id = bot
+            .get_chat(recipient_username.clone())
+            .await
+            .map_err(|_| TelegramBotError::Custom("Error finding user!".to_string()))?;
+            
+        //convert from ChatId to UserId: copilot helped with converting to correct types! I don't know if/how citing generated responses is neccessary :0
+        let user_id = UserId(recipient_chat_id.id.0.try_into().map_err(|_| 
+            TelegramBotError::Custom("integer64 value, I am a bot and I expected unsigned64 value beep boop".to_string()))?);
 
     if !is_initiated {
         tip_sender
@@ -156,7 +188,19 @@ pub async fn command_send(
         )
         .await?;
 
+    // private message sent to user from bot~
+    if let Some(message) = tip_message {
+        // error (red squigglies) for get_chat_member -> I think i'm just writing it down wrong :0
+        let recipient_chat_id = bot
+            .get_chat_member(channel_id, user_id)
+            .await
+            .map_err(|_| TelegramBotError::Custom("Failed to get reciever chat ID".to_string()))?;
+
+        bot.send_message(recipient_chat_id.user.id, message).await?;
+    }
     // @TODO(izio/tg): how to deal with private mentionning? Is this even possible?
+    //  -> https://stackoverflow.com/a/78459144  ~ Is this what you had mentioned to me?
+
 
     Ok(())
 }
